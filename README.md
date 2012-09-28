@@ -8,7 +8,7 @@ chipper uses `Deconfigurable` configurations provided by the [deconf library](ht
 Introduction:
 -------------
 
-`chipper` is a module that provides a logging system that attempts to make logging as easy as possible. The main aspects unique to `chipper` are:
+`chipper` is a module that provides a logging system that attempts to make logging as easy as possible. The main aspects unique to it are:
 
     * Multi-tag logging handlers
     * Declarative logging configuration
