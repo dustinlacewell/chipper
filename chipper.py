@@ -14,12 +14,13 @@ def from_file(filename, attribute):
     """
 
     conf_module = deconf.load_config(filename)
-    try:
-        return getattr(conf_module, attribute)
-    except AttributeError:
-        msg = "'{module}' has no log attribute '{attribute}'"
-        msg = msg.format(module=conf_module.__name__, attribute=attribute)
-        raise AttributeError(msg)
+    if conf_module:
+        try:
+            return getattr(conf_module, attribute)
+        except AttributeError:
+            msg = "'{module}' has no log attribute '{attribute}'"
+            msg = msg.format(module=conf_module.__name__, attribute=attribute)
+            raise AttributeError(msg)
 
 class Formatter(deconf.Deconfigurable):
     """
@@ -34,7 +35,7 @@ class Formatter(deconf.Deconfigurable):
         """
         The main logging template.
 
-        Available template vars:
+
             date : the date of log emission
             time : the time of log emission
             tags : a delimited list of emission tags
@@ -66,7 +67,7 @@ class Formatter(deconf.Deconfigurable):
         Strftime date format string.
 
         """
-        print "Handling date format", format
+        pass
 
     @deconf.parameter('time_format', ensure_type=str, default="%H:%M:%S")
     def handle_time_format(self, format):
@@ -74,7 +75,7 @@ class Formatter(deconf.Deconfigurable):
         Strftime time format string.
 
         """
-        print "Handling time format", format
+        pass
 
 
     def format_message(self, message, handler, tags, date, time):
@@ -242,7 +243,7 @@ class Log(object):
     """
     def __init__(self, handlers=None, default=default_handler):
         self.handlers = handlers or []
-        self.default = default_handler
+        self.default = default
 
     def log(self, message, *tags):
         """
