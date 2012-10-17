@@ -175,4 +175,4 @@ Item-group format options:
 Final emission format option:
 -----------------------------
 
-**template** `str`: The final render template incorporating all of the item-groups. Note that the `{trace}` format variable is only provided if the emission includes a trace tag. (default:`"{datetime}{trace}{tags} : ")
+**template** `str`: The final render template incorporating all of the item-groups. Note that the `{trace}` format variable is only provided if the emission includes a trace tag. (default:`"{datetime}{trace}{tags} : "`)
