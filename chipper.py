@@ -1,4 +1,4 @@
-import sys, datetime
+import os, sys, datetime, traceback
 
 import deconf
 
@@ -12,7 +12,6 @@ def from_file(filename, attribute):
     attribute - module-level attribute containing log
 
     """
-
     conf_module = deconf.load_config(filename)
     if conf_module:
         try:
@@ -30,26 +29,30 @@ class Formatter(deconf.Deconfigurable):
 
     """
 
-    @deconf.parameter('template', ensure_type=str, default="[{date} {time}][{tags}] : {message}")
+    @deconf.parameter('template', ensure_type=str, default="{datetime}{trace}{tags} :")
     def handle_template(self, template):
         """
         The main logging template.
-
-
             date : the date of log emission
             time : the time of log emission
             tags : a delimited list of emission tags
-            message : the emitted log message
+            trace: the trace information if present
         """
-        if not template.endswith('\n'):
-            template = template + '\n'
-        return template
-
-    @deconf.parameter('tag_delimiter', ensure_type=str, default=", ")
-    def handle_tag_delimiter(self, delimiter):
+        pass
+        
+    @deconf.parameter('tags_template', ensure_type=str, default="[{tags}]")
+    def handle_tags_template(self, template):
         """
-        The delimiter between joined tags.
+        The template for rendering the formatted tags list.
+            tags : the list of tags
+        """
+        pass
 
+    @deconf.parameter('tag_template', ensure_type=str, default="{tag}")
+    def handle_tag_template(self, template):
+        """
+        The template for rendering each tag.
+            tag : the tag to render
         """
         pass
 
@@ -61,11 +64,35 @@ class Formatter(deconf.Deconfigurable):
         """
         pass
 
+    @deconf.parameter('tag_delimiter', ensure_type=str, default=", ")
+    def handle_tag_delimiter(self, delimiter):
+        """
+        The delimiter between joined tags.
+
+        """
+        pass
+
+    @deconf.parameter('date_template', ensure_type=str, default="{date}")
+    def handle_date_template(self, template):
+        """
+        The template for rendering the date.
+            date : the date to render
+        """
+        pass
+
     @deconf.parameter('date_format', ensure_type=str, default="%Y-%m-%d")
     def handle_date_format(self, format):
         """
         Strftime date format string.
 
+        """
+        pass
+
+    @deconf.parameter('time_template', ensure_type=str, default="{time}")
+    def handle_time_template(self, template):
+        """
+        The template for rendering the time.
+            time : the time to render
         """
         pass
 
@@ -77,20 +104,81 @@ class Formatter(deconf.Deconfigurable):
         """
         pass
 
+    @deconf.parameter('datetime_template', ensure_type=str, default="[{date} {time}]")
+    def handle_datetime_template(self, template):
+        """
+        The template for rendering the date and time.
+            date : the formatted date to render
+            time : the formatted time to render
+        """
+        pass
 
-    def format_message(self, message, handler, tags, date, time):
+    @deconf.parameter('file_template', ensure_type=str, default="{file}")
+    def handle_file_template(self, template):
+        """
+        The template for rendering the filename.
+            file : the filename to render
+        """
+        pass
+
+    @deconf.parameter('line_template', ensure_type=str, default=":{line}")
+    def handle_line_template(self, template):
+        """
+        The template for rendering the line number.
+            line : the line number to render
+        """
+        pass
+
+    @deconf.parameter('module_template', ensure_type=str, default=":{module}")
+    def handle_module_template(self, template):
+        """
+        The template for rendering the module name.
+            module : the module name to render
+        """
+        pass
+
+    @deconf.parameter('trace_template', ensure_type=str, default="[{file}{line}]")
+    def handle_trace_template(self, template):
+        """
+        The template for rendering the trace info.
+            file : the formatted filename
+            line : the formatted line number
+            module : the formatted module name
+        """
+        pass
+
+
+    def format_message(self, message, handler, tags, date, time, file='', line='', module=''):
         """
         Format the message template in preparation for emission
         """
+
         tags = [self.tag_formatter(t) for t in tags]
+        tags = [self.tag_template.format(tag=t) for t in tags]
         tags = self.tag_delimiter.join(tags)
+        tags = self.tags_template.format(tags=tags)
+
+        date = date.strftime(self.date_format)
+        date = self.date_template.format(date=date)
+
+        time = time.strftime(self.time_format)
+        time = self.time_template.format(time=time)
+
+        datetime = self.datetime_template.format(date=date, time=time)
+
+        trace = ''
+        if file or line or module:
+            file = self.file_template.format(file=file)
+            line = self.line_template.format(line=line)
+            module = self.module_template.format(module=module)
+            trace = self.trace_template.format(file=file, line=line, module=module)
+
         return self.template.format(
-            message=message, 
             handler=handler.name, 
             tags=tags, 
-            date=date.strftime(self.date_format),
-            time=time.strftime(self.time_format),
-        )        
+            datetime=datetime,
+            trace=trace,
+        ) + message
 
 class Target(deconf.Deconfigurable):
     """
@@ -124,14 +212,6 @@ class Target(deconf.Deconfigurable):
         """
         pass
 
-    @deconf.parameter('formatter', ensure_type=Formatter, default=Formatter())
-    def handle_format(self, format): 
-        """
-        A Formatter object for rendering the formatted log message.
-
-        """
-        pass
-
     def __init__(self, *args, **kwargs):
         super(Target, self).__init__(*args, **kwargs)
         self.targets = []
@@ -142,13 +222,7 @@ class Target(deconf.Deconfigurable):
         if self.stderr:
             self.targets.append(sys.stderr)
 
-    def log(self, message, handler, tags, date, time):
-        message = self.formatter.format_message(message, handler, tags, date, time)
-
-        # ensure each log message ends with a newline
-        if not message.endswith('\n'):
-            message = message + "\n"
-
+    def log(self, message):
         for target in self.targets:
             target.write(message)
 
@@ -189,14 +263,25 @@ class Handler(deconf.Deconfigurable):
         """
         pass
 
-    def log(self, message, tags, date, time):
-        self.target.log(message, self, tags, date, time)
+    @deconf.parameter('formatter', ensure_type=Formatter, default=Formatter())
+    def handle_format(self, format): 
+        """
+        A Formatter object for rendering the formatted log message.
 
+        """
+        pass
+
+    def log(self, message, tags, date, time, **trace):
+        message = self.formatter.format_message(message, self, tags, date, time, **trace)
+        self.target.log(message + "\n")
 
 default_handler = Handler(
     name='default',
     tags=('*', ),
     target=Target(stdout=True),
+    formatter=Formatter(
+        template="{trace}{tags}:",
+    )
 )
 
 
@@ -211,7 +296,18 @@ class TaggedLog(object):
         self.tags = tags
 
     def __call__(self, message):
-        self.log.log(message, *self.tags)
+        if "trace" in self.tags:
+            trace = traceback.extract_stack()[-2]
+            file, line, module = (os.path.basename(trace[0]), trace[1], trace[2])
+
+            error = traceback.format_exc()
+            if error != "None\n":
+                message = "{0}\n{1}".format(message, error)
+            self.log.log(message, *self.tags, file=file, line=line, module=module)
+        else:
+            self.log.log(message, *self.tags)
+
+
 
 class Log(object):
     """
@@ -242,25 +338,34 @@ class Log(object):
     no tags matching a configured Handler.
     """
     def __init__(self, handlers=None, default=default_handler):
-        self.handlers = handlers or []
-        self.default = default
+        self.__handlers = handlers or []
+        self.__default = default
 
-    def log(self, message, *tags):
+    def _get_date_and_time(self):
+        now = datetime.datetime.now()
+        date = now.date()
+        time = now.time()
+        return (date, time)
+
+
+    def __call__(self, message):
+        date, time = self._get_date_and_time()
+        self.__default.log(message, ('default', ), date, time)
+
+    def log(self, message, *tags, **trace):
         """
         Base logging method. Takes a message and any number of
         tags. Will be routed to any Handlers listening for those
         provided tags.
 
         """
-        now = datetime.datetime.now()
-        date = now.date()
-        time = now.time()
+        date, time = self._get_date_and_time()
 
         handlers = {}
         unhandled = []
         for tag in tags:
             found = False
-            for handler in self.handlers:
+            for handler in self.__handlers:
                 if tag in handler.tags:
                     taglist = handlers.get(handler, [])
                     taglist.append(tag)
@@ -271,13 +376,13 @@ class Log(object):
         for handler, tags in handlers.items():
             handler.log(message, tags, date, time)
         if len(unhandled):
-            self.default.log(message, unhandled, date, time)
+            self.__default.log(message, unhandled, date, time, **trace)
 
     def __getattr__(self, name):
         try:
             return self.__getattribute__(name)
         except AttributeError:
-            tags = name.split("_")
+            tags = [t for t in name.split("_") if t]
             return TaggedLog(self, *tags)
 
 log = Log() # default log
