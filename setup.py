@@ -14,5 +14,5 @@ setup(
     author_email="dlacewell@gmail.com",
     url="https://github.com/dustinlacewell/chipper",
     description="Refreshingly simple declarative logging that utilizes arbitrary tag sinks instead of traditional level handling",
-    long_description=read('README'),
+    long_description=read('README.md'),
 )
